@@ -28,14 +28,14 @@ def job():
           print("[ERROR] Sending the HeatOn POST request failed at", datetime.datetime.now())
 
     # Debugging prints
-    print("[DEBUG] price[",datetime.datetime.now().hour,"]:",prices.iloc[datetime.datetime.now().hour],", prices.quantile(0.67):",prices.quantile(0.67))
-    print("[DEBUG] prices:\n",prices)
+    #print("[DEBUG] price[",datetime.datetime.now().hour,"]:",prices.iloc[datetime.datetime.now().hour],", prices.quantile(0.67):",prices.quantile(0.67))
+    #print("[DEBUG] prices:\n",prices)
 
 # Debugging scheduler
-schedule.every(3).seconds.do(job)
+#schedule.every(3).seconds.do(job)
 
 # Run job every even hour at the 00th minute
-#schedule.every().hour.at(":00").do(job)
+schedule.every().hour.at(":00").do(job)
 while True:
     schedule.run_pending()
     time.sleep(1)
