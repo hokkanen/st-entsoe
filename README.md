@@ -21,6 +21,11 @@ python3 edgebridge/edgebridge.py
 ```
 python3 st-entsoe.py
 ```
+If there is an error about the port being used by another process, try
+```
+ss -tulpn
+```
+to see if the pid of the process using the port belongs to an old instance of edgebridge.py and kill it.
 
 ## Create a system service that runs automatically
 TODO
