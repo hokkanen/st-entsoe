@@ -1,0 +1,3 @@
+[submodule "edgebridge"]
+	path = edgebridge
+	url = https://github.com/toddaustin07/edgebridge.git
