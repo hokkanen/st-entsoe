@@ -18,12 +18,12 @@ def job():
     prices = client.query_day_ahead_prices('FI', start=start, end=end)
     if prices[datetime.datetime.now().hour] > prices.quantile(0.67) and prices[datetime.datetime.now().hour] > 40 :
         try :
-          requests.post('http://192.168.1.231:8088/HeatOff/trigger')
+          requests.post('http://192.168.1.33:8088/HeatOff/trigger')
         except: 
           print("[ERROR] Sending the HeatOff POST request failed at", datetime.datetime.now())
     else :
         try :
-          requests.post('http://192.168.1.230:8088/HeatOn/trigger')
+          requests.post('http://192.168.1.33:8088/HeatOn/trigger')
         except: 
           print("[ERROR] Sending the HeatOn POST request failed at", datetime.datetime.now())
 
