@@ -9,7 +9,7 @@ import subprocess
 import threading
 import time 
 
-DEBUG = False
+DEBUG = True
 
 # Check for any running conflicting processes
 def check_procs():
@@ -44,6 +44,7 @@ def run_edgebridge():
         line = proc.stdout.readline()
         with threading.Lock():
             print(line.strip())
+        time.sleep(0.1)
     
 # Control heating by querying Ensto-E API and sending a POST request to edgebridge
 def heat_control():
