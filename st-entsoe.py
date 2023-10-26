@@ -22,9 +22,10 @@ def check_procs():
     other_instances = []
     for process in psutil.process_iter():
         if "python" in process.name():
-            if os.path.basename(process.cmdline()[1]) in script_name and process.pid != current_pid:
-                # Append the process + script name and pid to the list
-                other_instances.append((process.name() + " " + os.path.basename(process.cmdline()[1]), process.pid))
+            for arg in process.cmdline():
+                if os.path.basename(arg) in script_name and process.pid != current_pid:
+                    # Append the process + script name and pid to the list
+                    other_instances.append((process.name() + " " + os.path.basename(arg), process.pid))
 
     # Check if any conflicting processes found
     if other_instances:
@@ -42,9 +43,9 @@ def run_edgebridge():
     proc = subprocess.Popen(["python3", "-u", "../edgebridge/edgebridge.py"], cwd = "./workspace/", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text = True)
     while True:
         line = proc.stdout.readline()
-        with threading.Lock():
-            print(line.strip())
-        time.sleep(0.1)
+        if line:
+            with threading.Lock():
+                print(line.strip())
     
 # Control heating by querying Ensto-E API and sending a POST request to edgebridge
 def heat_control():
