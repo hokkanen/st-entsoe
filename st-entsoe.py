@@ -1,14 +1,60 @@
 from entsoe import EntsoePandasClient
 import datetime
+import os
 import pandas as pd
+import psutil
 import requests
 import schedule
-import time
+import subprocess
+import threading
+import time 
 
-def job():
+DEBUG = False
+
+# Check for any running conflicting processes
+def check_procs():
+    # Get the conflicting python script names
+    script_name = [os.path.basename(__file__), "edgebridge.py"]
+    # Get the current python process id
+    current_pid = os.getpid()
+
+    # Iterate over all the processes and collect any conflicting process
+    other_instances = []
+    for process in psutil.process_iter():
+        if "python" in process.name():
+            if os.path.basename(process.cmdline()[1]) in script_name and process.pid != current_pid:
+                # Append the process + script name and pid to the list
+                other_instances.append((process.name() + " " + os.path.basename(process.cmdline()[1]), process.pid))
+
+    # Check if any conflicting processes found
+    if other_instances:
+        # Print the name and pid of such processes
+        print(f"The following processes prevent", os.path.basename(__file__), "from running!") 
+        for name, pid in other_instances:
+            print(f" {name} {pid}")
+        # Print a command to kill the processes
+        print(f"\nYou can kill these processes by executing the following command:") 
+        print(f" kill {' '.join(str(pid) for name, pid in other_instances)}")
+        exit()
+
+# Launch edgebridge listener to pass messages to Smartthings hub
+def run_edgebridge(): 
+    proc = subprocess.Popen(["python3", "-u", "../edgebridge/edgebridge.py"], cwd = "./workspace/", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text = True)
+    while True:
+        line = proc.stdout.readline()
+        with threading.Lock():
+            print(line.strip())
+    
+# Control heating by querying Ensto-E API and sending a POST request to edgebridge
+def heat_control():
+    # Get API key from the file "apikey"
+    api_key = None
+    with open("./workspace/apikey", "r") as f:
+        api_key = f.readline()
+        api_key = api_key.strip()
 
     # Set correct options for the API call
-    client = EntsoePandasClient(api_key="d9268bc7-b025-45e9-8eee-103ed6e84197")
+    client = EntsoePandasClient(api_key = api_key)
     beginning_of_day = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     start = pd.Timestamp(beginning_of_day, tz='Europe/Helsinki')
     end = pd.Timestamp(beginning_of_day + datetime.timedelta(days=1, hours=-1), tz='Europe/Helsinki')
@@ -18,24 +64,41 @@ def job():
     prices = client.query_day_ahead_prices('FI', start=start, end=end)
     if prices.iloc[datetime.datetime.now().hour] > prices.quantile(0.67) and prices.iloc[datetime.datetime.now().hour] > 40:
         try:
-          requests.post('http://192.168.1.33:8088/HeatOff/trigger')
-        except: 
-          print("[ERROR] Sending the HeatOff POST request failed at", datetime.datetime.now())
+            with threading.Lock(): 
+                print("[REQUEST] Sending HeatOff POST request to edgebridge!", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")")
+            requests.post('http://192.168.1.33:8088/HeatOff/trigger')
+        except:
+            with threading.Lock(): 
+                print("[ERROR] Sending the HeatOff POST request failed at", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")")
     else:
         try:
-          requests.post('http://192.168.1.33:8088/HeatOn/trigger')
+            with threading.Lock(): 
+                print("[REQUEST] Sending HeatOn POST request to edgebridge!", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")")
+            requests.post('http://192.168.1.33:8088/HeatOn/trigger')
         except: 
-          print("[ERROR] Sending the HeatOn POST request failed at", datetime.datetime.now())
+            with threading.Lock():
+                print("[ERROR] Sending the HeatOn POST request failed at", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")")
 
     # Debugging prints
-    #print("[DEBUG] price[",datetime.datetime.now().hour,"]:",prices.iloc[datetime.datetime.now().hour],", prices.quantile(0.67):",prices.quantile(0.67))
-    #print("[DEBUG] prices:\n",prices)
+    if DEBUG == True:
+        with threading.Lock():
+            print("[DEBUG] price[", datetime.datetime.now().hour,"]:", prices.iloc[datetime.datetime.now().hour],", prices.quantile(0.67):", prices.quantile(0.67), "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")")
+            print("[DEBUG] prices:\n",prices)
 
-# Debugging scheduler
-#schedule.every(3).seconds.do(job)
+# Begin by checking for conflicting processes
+check_procs()
 
-# Run job every even hour at the 00th minute
-schedule.every().hour.at(":00").do(job)
+# Start edgebridge by another thread
+thread_eb = threading.Thread(target=run_edgebridge, daemon=True)
+thread_eb.start()
+
+# Schedule job for every even hour at the 00th minute
+if DEBUG == True:
+    schedule.every(3).seconds.do(heat_control) # debugging only
+else:
+    schedule.every().hour.at(":00").do(heat_control)
+
+# Run client indefinitely
 while True:
     schedule.run_pending()
     time.sleep(1)
