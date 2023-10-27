@@ -9,7 +9,7 @@ import subprocess
 import threading
 import time 
 
-DEBUG = True
+DEBUG = False
 
 # Check for any running conflicting processes
 def check_procs():
@@ -18,14 +18,15 @@ def check_procs():
     # Get the current python process id
     current_pid = os.getpid()
 
-    # Iterate over all the processes and collect any conflicting process
+    # Iterate over all the processes and collect any conflicting processes
     other_instances = []
     for process in psutil.process_iter():
         if "python" in process.name():
-            for arg in process.cmdline():
-                if os.path.basename(arg) in script_name and process.pid != current_pid:
-                    # Append the process + script name and pid to the list
-                    other_instances.append((process.name() + " " + os.path.basename(arg), process.pid))
+            for script in script_name:
+                for arg in process.cmdline():
+                    if script == os.path.basename(arg) and process.pid != current_pid:
+                        # Append the process + arg and pid to the list
+                        other_instances.append((process.name() + " " + arg, process.pid))
 
     # Check if any conflicting processes found
     if other_instances:
@@ -34,7 +35,7 @@ def check_procs():
         for name, pid in other_instances:
             print(f" {name} {pid}")
         # Print a command to kill the processes
-        print(f"\nYou can kill these processes by executing the following command:") 
+        print(f"\nKill these processes (in many systems) by:") 
         print(f" kill {' '.join(str(pid) for name, pid in other_instances)}")
         exit()
 
