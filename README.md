@@ -3,7 +3,7 @@
 The [st-entsoe.py](st-entsoe.py) python program obtains Finnish electricity prices from the [Entso-E Transparency platform API](https://transparency.entsoe.eu/), and sends an http binary request through the [edgebridge project](https://github.com/toddaustin07/edgebridge) to the [LAN Trigger](https://github.com/toddaustin07/lantrigger) edge driver installed on Smartthings. The [edgebridge.py](https://github.com/toddaustin07/edgebridge/blob/main/edgebridge.py) client is started by [st-entsoe.py](st-entsoe.py) as a subprocess and does not need to be run separately. The `stderr` and `stdout` output streams from [edgebridge.py](https://github.com/toddaustin07/edgebridge/blob/main/edgebridge.py) subprocess are piped through [st-entsoe.py](st-entsoe.py) `stdout` output stream.
 
 ## Installation
-Clone repo with the [edgebridge](https://github.com/toddaustin07/edgebridge/) submodule
+Clone repo with the [edgebridge](https://github.com/toddaustin07/edgebridge/) as a submodule
 ```
 git clone --recurse-submodules https://github.com/hokkanen/st-entsoe.git
 ```
@@ -30,4 +30,4 @@ allows the output to be directed to `nohup.out` file and the program to be kept 
 If any conflicting processes are already running (ie, [edgebridge.py](https://github.com/toddaustin07/edgebridge/blob/main/edgebridge.py) or another instance of [st-entsoe.py](st-entsoe.py)), the program does not start and suggest killing these processes first.
 
 ## Edgebridge status monitoring from Smartthings (optional)
-In addition to installing the [LAN Trigger](https://github.com/toddaustin07/lantrigger) edge driver for Smartthings app, it may be convenient to install [EdgeBridge Monitor](https://github.com/toddaustin07/edgebridge#optional-edgebridge-server-monitoring) edge driver as well to monitor the online/offline status of the [edgebridge](edgebridge) client.
+In addition to installing the [LAN Trigger](https://github.com/toddaustin07/lantrigger) edge driver for Smartthings app, it may be convenient to install [EdgeBridge Monitor](https://github.com/toddaustin07/edgebridge#optional-edgebridge-server-monitoring) edge driver as well to monitor the online/offline status of the [edgebridge](https://github.com/toddaustin07/edgebridge/) client.
