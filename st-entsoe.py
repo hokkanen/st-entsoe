@@ -31,12 +31,12 @@ def check_procs():
     # Check if any conflicting processes found
     if other_instances:
         # Print the name and pid of such processes
-        print(f"The following processes prevent", os.path.basename(__file__), "from running!") 
+        print(f"The following processes prevent", os.path.basename(__file__), "from running!", flush=True) 
         for name, pid in other_instances:
-            print(f" {name} {pid}")
+            print(f" {name} {pid}", flush=True)
         # Print a command to kill the processes
-        print(f"\nKill these processes (in many systems) by:") 
-        print(f" kill {' '.join(str(pid) for name, pid in other_instances)}")
+        print(f"\nKill these processes (in many systems) by:", flush=True)
+        print(f" kill {' '.join(str(pid) for name, pid in other_instances)}", flush=True)
         exit()
 
 # Launch edgebridge listener to pass messages to Smartthings hub
@@ -46,7 +46,7 @@ def run_edgebridge():
         line = proc.stdout.readline()
         if line:
             with threading.Lock():
-                print(line.strip())
+                print(line.strip(), flush=True)
     
 # Control heating by querying Ensto-E API and sending a POST request to edgebridge
 def heat_control():
@@ -68,25 +68,25 @@ def heat_control():
     if prices.iloc[datetime.datetime.now().hour] > prices.quantile(0.67) and prices.iloc[datetime.datetime.now().hour] > 40:
         try:
             with threading.Lock(): 
-                print("[REQUEST] Sending HeatOff POST request to edgebridge!", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")")
+                print("[REQUEST] Sending HeatOff POST request to edgebridge!", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")", flush=True)
             requests.post('http://192.168.1.33:8088/HeatOff/trigger')
         except:
             with threading.Lock(): 
-                print("[ERROR] Sending the HeatOff POST request failed at", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")")
+                print("[ERROR] Sending the HeatOff POST request failed at", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")", flush=True)
     else:
         try:
             with threading.Lock(): 
-                print("[REQUEST] Sending HeatOn POST request to edgebridge!", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")")
+                print("[REQUEST] Sending HeatOn POST request to edgebridge!", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")", flush=True)
             requests.post('http://192.168.1.33:8088/HeatOn/trigger')
         except: 
             with threading.Lock():
-                print("[ERROR] Sending the HeatOn POST request failed at", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")")
+                print("[ERROR] Sending the HeatOn POST request failed at", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")", flush=True)
 
     # Debugging prints
     if DEBUG == True:
         with threading.Lock():
-            print("[DEBUG] price[", datetime.datetime.now().hour,"]:", prices.iloc[datetime.datetime.now().hour],", prices.quantile(0.67):", prices.quantile(0.67), "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")")
-            print("[DEBUG] prices:\n",prices)
+            print("[DEBUG] price[", datetime.datetime.now().hour,"]:", prices.iloc[datetime.datetime.now().hour],", prices.quantile(0.67):", prices.quantile(0.67), "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")", flush=True)
+            print("[DEBUG] prices:\n",prices, flush=True)
 
 # Begin by checking for conflicting processes
 check_procs()
