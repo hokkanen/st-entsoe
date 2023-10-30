@@ -2,6 +2,8 @@
 
 The [st-entsoe.py](st-entsoe.py) python program obtains Finnish electricity prices from the [Entso-E Transparency platform API](https://transparency.entsoe.eu/), and sends an http binary request through the [edgebridge project](https://github.com/toddaustin07/edgebridge) to the [LAN Trigger](https://github.com/toddaustin07/lantrigger) edge driver installed on Smartthings. The [edgebridge.py](https://github.com/toddaustin07/edgebridge/blob/main/edgebridge.py) client is started by [st-entsoe.py](st-entsoe.py) as a subprocess and does not need to be run separately. The `stderr` and `stdout` output streams from [edgebridge.py](https://github.com/toddaustin07/edgebridge/blob/main/edgebridge.py) subprocess are piped through [st-entsoe.py](st-entsoe.py) `stdout` output stream.
 
+NOTE! The device running [st-entsoe.py](st-entsoe.py) should be connected to the same local area network as the Smartthings hub.
+
 ## Installation
 Clone repo with the [edgebridge](https://github.com/toddaustin07/edgebridge/) as a submodule
 ```
