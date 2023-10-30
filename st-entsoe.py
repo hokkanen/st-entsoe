@@ -59,33 +59,35 @@ def heat_control():
     # Set correct options for the API call
     client = EntsoePandasClient(api_key = api_key)
     beginning_of_day = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    start = pd.Timestamp(beginning_of_day, tz='Europe/Helsinki')
-    end = pd.Timestamp(beginning_of_day + datetime.timedelta(days=1, hours=-1), tz='Europe/Helsinki')
+    pandas_start = pd.Timestamp(beginning_of_day, tz='Europe/Helsinki')
+    pandas_end = pd.Timestamp(beginning_of_day + datetime.timedelta(days=1, hours=-1), tz='Europe/Helsinki')
     country_code = 'FI'
 
     # Set HeatOff if one of 8 most costly hours of the day and the hourly price is over 4cnt/kWh (VAT excluded)
-    prices = client.query_day_ahead_prices('FI', start=start, end=end)
-    if prices.iloc[datetime.datetime.now().hour] > prices.quantile(0.67) and prices.iloc[datetime.datetime.now().hour] > 40:
+    prices = client.query_day_ahead_prices('FI', start=pandas_start, end=pandas_end)
+    pandas_time = pd.Timestamp(datetime.datetime.now().replace(microsecond=0), tz='Europe/Helsinki')
+    pandas_hour = pd.Timestamp(datetime.datetime.now().replace(minute=0, second=0, microsecond=0), tz='Europe/Helsinki')
+    if prices[pandas_hour] > prices.quantile(0.67) and prices[pandas_hour] > 40:
         try:
             with threading.Lock(): 
-                print("[REQUEST] Sending HeatOff POST request to edgebridge!", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")", flush=True)
+                print("[REQUEST] Sending HeatOff POST request to edgebridge!", "(", pandas_time, ")", flush=True)
             requests.post('http://192.168.1.33:8088/HeatOff/trigger')
         except:
             with threading.Lock(): 
-                print("[ERROR] Sending the HeatOff POST request failed at", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")", flush=True)
+                print("[ERROR] Sending the HeatOff POST request failed at", "(", pandas_time, ")", flush=True)
     else:
         try:
             with threading.Lock(): 
-                print("[REQUEST] Sending HeatOn POST request to edgebridge!", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")", flush=True)
+                print("[REQUEST] Sending HeatOn POST request to edgebridge!", "(", pandas_time, ")", flush=True)
             requests.post('http://192.168.1.33:8088/HeatOn/trigger')
         except: 
             with threading.Lock():
-                print("[ERROR] Sending the HeatOn POST request failed at", "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")", flush=True)
+                print("[ERROR] Sending the HeatOn POST request failed at", "(", pandas_time, ")", flush=True)
 
     # Debugging prints
     if DEBUG == True:
         with threading.Lock():
-            print("[DEBUG] price[", datetime.datetime.now().hour,"]:", prices.iloc[datetime.datetime.now().hour],", prices.quantile(0.67):", prices.quantile(0.67), "(", datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"), ")", flush=True)
+            print("[DEBUG] price[", pandas_hour,"]:", prices[pandas_hour],", prices.quantile(0.67):", prices.quantile(0.67), "(", pandas_time, ")", flush=True)
             print("[DEBUG] prices:\n",prices, flush=True)
 
 # Begin by checking for conflicting processes
