@@ -113,7 +113,7 @@ async function get_prices() {
 async function adjust_heat() {
 
     // Get daily spot prices
-    prices = await get_prices();
+    const prices = await get_prices();
 
     // Define function for sending a post request to edgebridge
     const post_trigger = async function (device) {
