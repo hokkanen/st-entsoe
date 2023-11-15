@@ -54,7 +54,7 @@ async function check_procs() {
                 console.log(err_msg);
                 reject();
             }else{
-               resolve();     	
+                resolve();     	
             }
         });
     });
@@ -82,7 +82,7 @@ async function get_prices() {
     let period_start = `${hour_ahead_utc.toISOString().replace(/[-:T.]/g, '').slice(0, 8)}`+`0000`;
     let period_end = `${hour_ahead_utc.toISOString().replace(/[-:T.]/g, '').slice(0, 8)}`+`2300`;
 
-    // Set compulsory strings for the API call
+    // Set additional compulsory strings for the API call
     let document_type = `A44`;
     let process_type = `A01`;
     let location_id = `10YFI-1--------U`;
@@ -95,9 +95,17 @@ async function get_prices() {
 
     // Get price information from the parsed json into the returned prices array
     let prices = [];
-    json_data.Publication_MarketDocument.TimeSeries.Period.Point.forEach(function (entry) {
-        prices.push(parseFloat(entry['price.amount']));
-    });
+    try{
+        json_data.Publication_MarketDocument.TimeSeries.Period.Point.forEach(function (entry) {
+            prices.push(parseFloat(entry['price.amount']));
+        });
+    }catch{
+        if(`html` in json_data && `body` in json_data.html)
+            console.log(`[ERROR] Entso-E API: "${json_data.html.body}" (${new Date().toLocaleString('en-GB')})`);
+        else
+            console.log(`[ERROR] Cannot parse Entso-E API response! (${new Date().toLocaleString('en-GB')})`);
+    }
+    
     return prices;
 }
 
@@ -130,7 +138,7 @@ async function adjust_heat() {
     }
 }
 
-// Begin here
+// Begin execution here
 (async () => {
     // Check conflicting processes and exit if found
     await check_procs().catch(error => process.exit());
@@ -144,6 +152,3 @@ async function adjust_heat() {
     else
         schedule.scheduleJob('0 * * * *', adjust_heat);
 })();
-
-// Keep server running
-process.stdin.resume();
