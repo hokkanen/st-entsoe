@@ -12,7 +12,7 @@ git clone --recurse-submodules https://github.com/hokkanen/st-entsoe.git
 
 Install npm dependencies by running
 ```
-npm install .
+npm i
 ```
 
 ## Setup
