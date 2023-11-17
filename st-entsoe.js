@@ -1,10 +1,12 @@
-const quantile = require( 'compute-quantile' );
 const fetch = require('node-fetch');
+const fs = require('fs');
+const ip = require('ip');
 const path = require('path');
 const proc = require('process');
 const ps = require('ps-node');
-const spawn = require('child_process').spawn;
+const quantile = require('compute-quantile');
 const schedule = require('node-schedule');
+const spawn = require('child_process').spawn;
 const { XMLParser, XMLBuilder, XMLValidator}  = require("fast-xml-parser");
 
 // Set debugging settings and prints
@@ -74,7 +76,6 @@ async function run_edgebridge() {
 async function get_prices() {
 
     // Get API key from the file "apikey"
-    const fs = require('fs');
     const api_key = fs.readFileSync('./workspace/apikey', 'utf8').trim();
 
     // The date is determined from the UTC+1 time because the 24-hour API price period is from 23:00 yesterday to 23:00 today
@@ -118,7 +119,7 @@ async function adjust_heat() {
     // Define function for sending a post request to edgebridge
     const post_trigger = async function (device) {
         console.log(`[REQUEST] Sending ${device} POST request to edgebridge! (${new Date().toLocaleString('en-GB')})`);
-        const response = await fetch(`http://192.168.1.33:8088/${device}/trigger`, {method: 'POST'}).catch(error => console.log(error));
+        const response = await fetch(`http://${ip.address()}:8088/${device}/trigger`, {method: 'POST'}).catch(error => console.log(error));
     }
 
     // The index maps to the ceiling of the current UTC hour (0 for 23-00, 1 for 00-01, 2 for 01-02)
