@@ -4,13 +4,30 @@ const ip = require('ip');
 const path = require('path');
 const proc = require('process');
 const ps = require('ps-node');
-const quantile = require('compute-quantile');
 const schedule = require('node-schedule');
 const spawn = require('child_process').spawn;
 const { XMLParser, XMLBuilder, XMLValidator } = require("fast-xml-parser");
 
 // Set debugging settings and prints
 const DEBUG = false;
+
+// Set path to apikey file
+const apikey_path = './workspace/apikey';
+
+// Set geographical location for weather API
+const country_code = 'fi';
+const postal_code = '06150';
+
+// Mapping between temperature and heating hours (uses linear interpolation in between points)
+const temp_to_hours = [
+    { temp: 30, hours: 1 },
+    { temp: 20, hours: 2 },
+    { temp: 10, hours: 10 },
+    { temp: 0, hours: 14 },
+    { temp: -10, hours: 18 },
+    { temp: -20, hours: 22 },
+    { temp: -30, hours: 24 }
+];
 
 // Check for any running conflicting processes
 async function check_procs() {
@@ -72,11 +89,41 @@ async function run_edgebridge() {
         eb = spawn('python3', ['-u', `${__dirname}/edgebridge/edgebridge.py`], { cwd: `${__dirname}/workspace/`, stdio: 'inherit' });
 }
 
+// Get API keys from the file "apikey"
+function keys() {
+	let entsoe_token = '';
+	let weather_token = '';
+
+	if (fs.existsSync(apikey_path)) {
+		const keydata = fs.readFileSync(apikey_path, 'utf8').split('\n');
+		entsoe_token = keydata[0] ? keydata[0].trim() : entsoe_token;
+		weather_token = keydata[1] ? keydata[1].trim() : weather_token;
+	}
+
+	const json = {
+		"entsoe_token": entsoe_token,
+		"weather_token": weather_token
+	};
+	return json;
+}
+
+// Check the fetch response status
+async function check_response(response, type) {
+    if (response.status === 200) {
+        console.log(`[REQUEST] ${type} query successful (${new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC"})`);
+    }
+    else {
+        console.log(`[ERROR] ${type} query failed (${new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC"})`)
+        console.log(` API Status: ${response.status}\n API response: ${response.statusText}`);
+    }
+    return response.status;
+}
+
 // Query Ensto-E API directly to get the daily spot prices
 async function get_prices() {
 
-    // Get API key from the file "apikey"
-    const api_key = fs.readFileSync('./workspace/apikey', 'utf8').trim();
+    // Get Entso-E API key
+    const api_key = keys().entsoe_token;
 
     // The date is determined from the UTC+1 time because the 24-hour API price period is from 23:00 yesterday to 23:00 today
     const hour_ahead_utc = new Date(new Date().setTime(new Date().getTime() + (60 * 60 * 1000)));
@@ -111,11 +158,57 @@ async function get_prices() {
     return prices;
 }
 
+async function get_heating_hours(temp) {
+    // If the temperature is above the highest point or below the lowest point, return the corresponding hours
+    if (temp >= temp_to_hours[0].temp) return temp_to_hours[0].hours;
+    if (temp <= temp_to_hours[temp_to_hours.length - 1].temp) return temp_to_hours[temp_to_hours.length - 1].hours;
+
+    // Find the two points between which the temperature falls
+    let i = 0;
+    while (temp < temp_to_hours[i].temp) i++;
+
+    // Perform linear interpolation between the two points
+    const x1 = temp_to_hours[i - 1].temp, y1 = temp_to_hours[i - 1].hours;
+    const x2 = temp_to_hours[i].temp, y2 = temp_to_hours[i].hours;
+    const hours = y1 + ((y2 - y1) / (x2 - x1)) * (temp - x1);
+
+    return Math.round(hours);;
+}
+
+async function get_outside_temp() {
+    
+    // Get OpenWeatherMap API key
+    const api_key = keys().weather_token;
+
+    // Send API get request
+    const response = await fetch(
+        `http://api.openweathermap.org/data/2.5/weather?zip=${postal_code},${country_code}&appid=${api_key}&units=metric`)
+        .catch(error => console.log(error));
+    
+    // Return 0C if the query failed, else return true outside temperature
+    if (await check_response(response, 'OpenWeatherMap') !== 200)
+        return 0.0;
+    else
+        return (await response.json()).main.temp;
+}
+
 // Control heating by sending a POST request to edgebridge
 async function adjust_heat() {
 
     // Get daily spot prices
     const prices = await get_prices();
+
+    // Get the current outside temperature
+    const outside_temp = await get_outside_temp();
+
+    // Calculate the number of heating hours based on the outside temperature
+    const heating_hours = await get_heating_hours(outside_temp);
+
+    // Sort the prices array
+    const sorted_prices = [...prices].sort((a, b) => a - b);
+
+    // Get the price of the threshold heating hour (most expensive hour with heating on)
+    const threshold_price = sorted_prices[heating_hours - 1];
 
     // Define function for sending a post request to edgebridge
     const post_trigger = async function (device) {
@@ -126,16 +219,18 @@ async function adjust_heat() {
     // The index maps to the ceiling of the current UTC hour (0 for 23-00, 1 for 00-01, 2 for 01-02)
     const index = parseInt(new Date(new Date().setTime(new Date().getTime() + (60 * 60 * 1000))).getUTCHours());
 
-    // Send HeatOff request if one of 8 most costly hours of the day and the hourly price is over 4cnt/kWh, else HeatOn
-    if (prices[index] > quantile(prices, 0.67) && prices[index] > 40)
+    // Status print
+    console.log(`[STATUS] heating_hours: ${heating_hours}, price[${index - 1}]: ${prices[index]}, threshold_price: ${threshold_price} ` +
+        `(${new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC"})`);
+
+    // Send HeatOff request if price higher than threshold and the hourly price is over 4cnt/kWh, else HeatOn
+    if (prices[index] > threshold_price && prices[index] > 40)
         await post_trigger("HeatOff");
     else
         await post_trigger("HeatOn");
 
     // Debugging prints
     if (DEBUG) {
-        console.log(`[DEBUG] price[${index - 1}]: ${prices[index]}, quantile(prices, 0.67): ${quantile(prices, 0.67)} ` +
-            `(${new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC"})`);
         console.log(prices);
     }
 }
