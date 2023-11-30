@@ -220,7 +220,7 @@ async function adjust_heat() {
     const index = parseInt(new Date(new Date().setTime(new Date().getTime() + (60 * 60 * 1000))).getUTCHours());
 
     // Status print
-    console.log(`[STATUS] heating_hours: ${heating_hours}, price[${index - 1}]: ${prices[index]}, threshold_price: ${threshold_price} ` +
+    console.log(`[STATUS] heating_hours: ${heating_hours} (${outside_temp}C), price[${index - 1}]: ${prices[index]}, threshold_price: ${threshold_price} ` +
         `(${new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC"})`);
 
     // Send HeatOff request if price higher than threshold and the hourly price is over 4cnt/kWh, else HeatOn
