@@ -1,11 +1,7 @@
 const fetch = require('node-fetch');
 const fs = require('fs');
 const ip = require('ip');
-const path = require('path');
-const proc = require('process');
-const ps = require('ps-node');
 const schedule = require('node-schedule');
-const spawn = require('child_process').spawn;
 const { XMLParser, XMLBuilder, XMLValidator } = require("fast-xml-parser");
 
 // Set debugging settings and prints
@@ -28,66 +24,6 @@ const temp_to_hours = [
     { temp: -20, hours: 22 },
     { temp: -30, hours: 24 }
 ];
-
-// Check for any running conflicting processes
-async function check_procs() {
-
-    // Currently executing script's name and pid
-    const current_filename = path.basename(__filename);
-    const current_pid = proc.pid;
-
-    // Conflicting processes to check for [bin, arg]
-    const conflicts = [
-        ['node', 'st-entsoe.js'],
-        ['python', 'st-entsoe.py'],
-        ['edgebridge', ''],
-        ['python', 'edgebridge.py']
-    ];
-
-    // Iterate over all the processes and collect any conflicting processes
-    const promise = await new Promise((resolve, reject) => {
-        ps.lookup({}, function (err, results) {
-            if (err) {
-                throw new Error(err);
-            }
-            let conflict_procs = [];
-            results.forEach(function (process) {
-                conflicts.forEach(function (conflict) {
-                    if (path.basename(process.command).includes(conflict[0])) {
-                        let args = process.arguments;
-                        if (args.length == 0) args = [''];
-                        args.forEach(function (arg) {
-                            if (path.basename(arg) === conflict[1] && current_pid != process.pid) {
-                                conflict_procs.push(`${process.command} ${arg} (${process.pid})`);
-                            }
-                        });
-                    }
-                });
-            });
-
-            // Check if any conflicting processes found
-            if (conflict_procs.length > 0) {
-                const err_msg = `The following processes prevent ${current_filename} from running!\n` +
-                    ` ${conflict_procs.join('\n ')}\n\nKill these processes (in Linux) by:\n` +
-                    ` kill -9 ${conflict_procs.map((instance) => instance.split(' ').pop().slice(1, -1)).join(' ')}\n`;
-                console.log(err_msg);
-                reject();
-            } else {
-                resolve();
-            }
-        });
-    });
-    return promise;
-}
-
-// Launch edgebridge listener to pass messages to Smartthings hub
-async function run_edgebridge() {
-    let eb;
-    if (process.platform === 'win32')
-        eb = spawn(`${__dirname}/edgebridge/edgebridge.exe`, { cwd: `${__dirname}/workspace/`, stdio: 'inherit' });
-    else
-        eb = spawn('python3', ['-u', `${__dirname}/edgebridge/edgebridge.py`], { cwd: `${__dirname}/workspace/`, stdio: 'inherit' });
-}
 
 // Get API keys from the file "apikey"
 function keys() {
@@ -237,12 +173,6 @@ async function adjust_heat() {
 
 // Begin execution here
 (async () => {
-    // Check conflicting processes and exit if found
-    await check_procs().catch(error => process.exit());
-
-    // Start edgebridge as a child process
-    run_edgebridge();
-
     // Run once and then control heating with set schedule
     adjust_heat();
     schedule.scheduleJob('0 * * * *', adjust_heat);
