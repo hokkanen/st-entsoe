@@ -9,7 +9,7 @@ const DEBUG = false;
 
 // Set path to apikey file and heatoff csv
 const apikey_path = './workspace/apikey';
-const csv_path = './workspace/heatoff.csv';
+const csv_path = './workspace/st-entsoe.csv';
 
 // Set geographical location for weather API
 const country_code = 'fi';
@@ -129,13 +129,13 @@ async function get_outside_temp() {
         return (await response.json()).main.temp;
 }
 
-async function write_csv() {
+async function write_csv(heatoff, price, temp_in, temp_out) {
 	// Check if the file already exists and is not empty
 	const csv_append = fs.existsSync(csv_path) && !(fs.statSync(csv_path).size === 0);
 
 	// If the file does not exists, create file and add first line
 	if (!csv_append)
-		fs.writeFileSync(csv_path, 'unix_time\n');
+		fs.writeFileSync(csv_path, 'unix_time,price,heat_on,temp_in,temp_out,\n');
 
 	// Append data to the file
 	const unix_time = Math.floor(Date.now() / 1000);
@@ -176,9 +176,10 @@ async function adjust_heat() {
     // Send HeatOff request if price higher than threshold and the hourly price is over 4cnt/kWh, else HeatOn
     if (prices[index] > threshold_price && prices[index] > 40){
         await post_trigger("HeatOff");
-        await write_csv();
+        await write_csv(prices[index],0,18,outside_temp);
     } else {
         await post_trigger("HeatOn");
+        await write_csv(prices[index],1,22,outside_temp);
     }
 
     // Debugging prints
