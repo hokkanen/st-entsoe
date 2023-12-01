@@ -26,7 +26,7 @@ The [work directory](workspace) for [st-entsoe.js](st-entsoe.js) should contain 
 ## Running
 Run [edgebridge.py](https://github.com/toddaustin07/edgebridge/edgebridge.py) and [st-entsoe.js](st-entsoe.js) with pm2 by
 ```
-pm2 start edgebridge.py --interpreter python3
+pm2 start edgebridge/edgebridge.py --interpreter python3
 ```
 and
 ```
