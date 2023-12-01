@@ -7,8 +7,9 @@ const { XMLParser, XMLBuilder, XMLValidator } = require("fast-xml-parser");
 // Set debugging settings and prints
 const DEBUG = false;
 
-// Set path to apikey file
+// Set path to apikey file and heatoff csv
 const apikey_path = './workspace/apikey';
+const csv_path = './workspace/heatoff.csv';
 
 // Set geographical location for weather API
 const country_code = 'fi';
@@ -128,6 +129,19 @@ async function get_outside_temp() {
         return (await response.json()).main.temp;
 }
 
+async function write_csv() {
+	// Check if the file already exists and is not empty
+	const csv_append = fs.existsSync(csv_path) && !(fs.statSync(csv_path).size === 0);
+
+	// If the file does not exists, create file and add first line
+	if (!csv_append)
+		fs.writeFileSync(csv_path, 'unix_time_heatoff\n');
+
+	// Append data to the file
+	const unix_time = Math.floor(Date.now() / 1000);
+	fs.appendFileSync(csv_path, `${unix_time}\n`);
+}
+
 // Control heating by sending a POST request to edgebridge
 async function adjust_heat() {
 
@@ -160,10 +174,12 @@ async function adjust_heat() {
         `(${new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC"})`);
 
     // Send HeatOff request if price higher than threshold and the hourly price is over 4cnt/kWh, else HeatOn
-    if (prices[index] > threshold_price && prices[index] > 40)
+    if (prices[index] > threshold_price && prices[index] > 40){
         await post_trigger("HeatOff");
-    else
+        await write_csv();
+    } else {
         await post_trigger("HeatOn");
+    }
 
     // Debugging prints
     if (DEBUG) {
