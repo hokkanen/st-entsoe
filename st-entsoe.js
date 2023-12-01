@@ -135,7 +135,7 @@ async function write_csv() {
 
 	// If the file does not exists, create file and add first line
 	if (!csv_append)
-		fs.writeFileSync(csv_path, 'unix_time_heatoff\n');
+		fs.writeFileSync(csv_path, 'unix_time\n');
 
 	// Append data to the file
 	const unix_time = Math.floor(Date.now() / 1000);
