@@ -21,7 +21,7 @@ cd st-entsoe && npm i
 ```
 
 ## Setup
-The [work directory](workspace) for [st-entsoe.js](st-entsoe.js) should contain an [API key file](workspace/apikey) with the user-specific Entso-E API key, which can be obtained from [Entso-E Transparency platform](https://transparency.entsoe.eu/).
+The [work directory](workspace) for [st-entsoe.js](st-entsoe.js) should contain an [API key file](workspace/apikey) with the user-specific [Entso-E](https://transparency.entsoe.eu/) and [OpenWeatherMap](https://home.openweathermap.org/) API keys, which can be obtained freely by registering to these services.
 
 ## Running
 Run [edgebridge.py](https://github.com/toddaustin07/edgebridge/edgebridge.py) and [st-entsoe.js](st-entsoe.js) with pm2 by
