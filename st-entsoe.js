@@ -139,7 +139,7 @@ async function write_csv(heatoff, price, temp_in, temp_out) {
 
 	// Append data to the file
 	const unix_time = Math.floor(Date.now() / 1000);
-	fs.appendFileSync(csv_path, `${unix_time}\n`);
+	fs.appendFileSync(csv_path, `${unix_time},${heatoff},${price},${temp_in},${temp_out}\n`);
 }
 
 // Control heating by sending a POST request to edgebridge
@@ -176,10 +176,10 @@ async function adjust_heat() {
     // Send HeatOff request if price higher than threshold and the hourly price is over 4cnt/kWh, else HeatOn
     if (prices[index] > threshold_price && prices[index] > 40){
         await post_trigger("HeatOff");
-        await write_csv(prices[index],0,18,outside_temp);
+        await write_csv(prices[index]/10.0,0,0,outside_temp);
     } else {
         await post_trigger("HeatOn");
-        await write_csv(prices[index],1,22,outside_temp);
+        await write_csv(prices[index]/10.0,1,0,outside_temp);
     }
 
     // Debugging prints
