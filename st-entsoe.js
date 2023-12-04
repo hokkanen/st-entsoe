@@ -15,6 +15,9 @@ const csv_path = './workspace/st-entsoe.csv';
 const country_code = 'fi';
 const postal_code = '06150';
 
+// SmartThings device for inside temperature (optional, only for csv logging)
+const st_device_id = 'a9a99271-4d4b-4344-9c08-e30f38fc3d41';
+
 // Mapping between temperature and heating hours (uses linear interpolation in between points)
 const temp_to_hours = [
     { temp: 30, hours: 1 },
@@ -28,20 +31,23 @@ const temp_to_hours = [
 
 // Get API keys from the file "apikey"
 function keys() {
-	let entsoe_token = '';
-	let weather_token = '';
+    let entsoe_token = '';
+    let weather_token = '';
+    let st_token = '';
 
-	if (fs.existsSync(apikey_path)) {
-		const keydata = fs.readFileSync(apikey_path, 'utf8').split('\n');
-		entsoe_token = keydata[0] ? keydata[0].trim() : entsoe_token;
-		weather_token = keydata[1] ? keydata[1].trim() : weather_token;
-	}
+    if (fs.existsSync(apikey_path)) {
+        const keydata = fs.readFileSync(apikey_path, 'utf8').split('\n');
+        entsoe_token = keydata[0] ? keydata[0].trim() : entsoe_token;
+        weather_token = keydata[1] ? keydata[1].trim() : weather_token;
+        st_token = keydata[2] ? keydata[2].trim() : st_token;
+    }
 
-	const json = {
-		"entsoe_token": entsoe_token,
-		"weather_token": weather_token
-	};
-	return json;
+    const json = {
+        "entsoe_token": entsoe_token,
+        "weather_token": weather_token,
+        "st_token": st_token
+    };
+    return json;
 }
 
 // Check the fetch response status
@@ -112,8 +118,26 @@ async function get_heating_hours(temp) {
     return Math.round(hours);;
 }
 
+async function get_inside_temp() {
+
+    // Set API request options
+    const options = {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${keys().st_token}`, 'Content-Type': 'application/json' },
+    };
+
+    // Send API get request
+    const response = await fetch(`https://api.smartthings.com/v1/devices/${st_device_id}/status`, options).catch(err => console.error(err));
+
+    // Return 0C if the query failed, else return true inside temperature
+    if (await check_response(response, 'SmartThings') !== 200)
+        return 0.0;
+    else
+        return (await response.json()).components.main.temperatureMeasurement.temperature.value;
+}
+
 async function get_outside_temp() {
-    
+
     // Get OpenWeatherMap API key
     const api_key = keys().weather_token;
 
@@ -121,7 +145,7 @@ async function get_outside_temp() {
     const response = await fetch(
         `http://api.openweathermap.org/data/2.5/weather?zip=${postal_code},${country_code}&appid=${api_key}&units=metric`)
         .catch(error => console.log(error));
-    
+
     // Return 0C if the query failed, else return true outside temperature
     if (await check_response(response, 'OpenWeatherMap') !== 200)
         return 0.0;
@@ -130,16 +154,16 @@ async function get_outside_temp() {
 }
 
 async function write_csv(heatoff, price, temp_in, temp_out) {
-	// Check if the file already exists and is not empty
-	const csv_append = fs.existsSync(csv_path) && !(fs.statSync(csv_path).size === 0);
+    // Check if the file already exists and is not empty
+    const csv_append = fs.existsSync(csv_path) && !(fs.statSync(csv_path).size === 0);
 
-	// If the file does not exists, create file and add first line
-	if (!csv_append)
-		fs.writeFileSync(csv_path, 'unix_time,price,heat_on,temp_in,temp_out,\n');
+    // If the file does not exists, create file and add first line
+    if (!csv_append)
+        fs.writeFileSync(csv_path, 'unix_time,price,heat_on,temp_in,temp_out,\n');
 
-	// Append data to the file
-	const unix_time = Math.floor(Date.now() / 1000);
-	fs.appendFileSync(csv_path, `${unix_time},${heatoff},${price},${temp_in},${temp_out}\n`);
+    // Append data to the file
+    const unix_time = Math.floor(Date.now() / 1000);
+    fs.appendFileSync(csv_path, `${unix_time},${heatoff},${price},${temp_in},${temp_out}\n`);
 }
 
 // Control heating by sending a POST request to edgebridge
@@ -147,6 +171,9 @@ async function adjust_heat() {
 
     // Get daily spot prices
     const prices = await get_prices();
+
+    // Get the current inside temperature
+    const inside_temp = await get_inside_temp();
 
     // Get the current outside temperature
     const outside_temp = await get_outside_temp();
@@ -174,12 +201,12 @@ async function adjust_heat() {
         `(${new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC"})`);
 
     // Send HeatOff request if price higher than threshold and the hourly price is over 4cnt/kWh, else HeatOn
-    if (prices[index] > threshold_price && prices[index] > 40){
+    if (prices[index] > threshold_price && prices[index] > 40) {
         await post_trigger("HeatOff");
-        await write_csv(prices[index]/10.0,0,0,outside_temp);
+        await write_csv(prices[index] / 10.0, 0, inside_temp, outside_temp);
     } else {
         await post_trigger("HeatOn");
-        await write_csv(prices[index]/10.0,1,0,outside_temp);
+        await write_csv(prices[index] / 10.0, 1, inside_temp, outside_temp);
     }
 
     // Debugging prints
