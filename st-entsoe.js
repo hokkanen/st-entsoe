@@ -50,53 +50,110 @@ function keys() {
     return json;
 }
 
+function date_string() {
+    return new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC";
+}
+
 // Check the fetch response status
 async function check_response(response, type) {
     if (response.status === 200) {
-        console.log(`[REQUEST] ${type} query successful (${new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC"})`);
+        console.log(`[REQUEST] ${type} query successful (${date_string()})`);
     }
     else {
-        console.log(`[ERROR] ${type} query failed (${new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC"})`)
+        console.log(`[ERROR] ${type} query failed (${date_string()})`)
         console.log(` API Status: ${response.status}\n API response: ${response.statusText}`);
     }
     return response.status;
 }
 
 // Query Ensto-E API directly to get the daily spot prices
-async function get_prices() {
+async function query_entsoe_prices(start_date, end_date) {
 
     // Get Entso-E API key
     const api_key = keys().entsoe_token;
 
-    // The date is determined from the UTC+1 time because the 24-hour API price period is from 23:00 yesterday to 23:00 today
-    const hour_ahead_utc = new Date(new Date().setTime(new Date().getTime() + (60 * 60 * 1000)));
-    const period_start = `${hour_ahead_utc.toISOString().replace(/[-:T.]/g, '').slice(0, 8)}` + `0000`;
-    const period_end = `${hour_ahead_utc.toISOString().replace(/[-:T.]/g, '').slice(0, 8)}` + `2300`;
+    // Format the dates into the required string format at 23:00 UTC
+    const period_start = `${start_date.toISOString().replace(/[-:T.]/g, '').slice(0, 8)}` + `2300`;
+    const period_end = `${end_date.toISOString().replace(/[-:T.]/g, '').slice(0, 8)}` + `2300`;
 
     // Set additional compulsory strings for the API call
     const document_type = `A44`;
     const process_type = `A01`;
     const location_id = `10YFI-1--------U`;
 
-    // Send API get request
-    let request = `https://web-api.tp.entsoe.eu/api?securityToken=${api_key}&documentType=${document_type}&processType=${process_type}` +
-        `&in_Domain=${location_id}&out_Domain=${location_id}&periodStart=${period_start}&periodEnd=${period_end}`
+    // Send API get request to Entso-E
+    const request = `https://web-api.tp.entsoe.eu/api?securityToken=${api_key}&documentType=${document_type}&processType=${process_type}` +
+                    `&in_Domain=${location_id}&out_Domain=${location_id}&periodStart=${period_start}&periodEnd=${period_end}`
     const response = await fetch(request).catch(error => console.log(error));
 
-    // Parse the received xml into json and store price information into the returned prices array
-    let json_data;
+    // Get prices (if query fails, empty array is returned)
     let prices = [];
-    try {
-        json_data = new XMLParser().parse(await response.text());
-        json_data.Publication_MarketDocument.TimeSeries.Period.Point.forEach(function (entry) {
-            prices.push(parseFloat(entry['price.amount']));
-        });
-    } catch {
-        if (`html` in json_data && `body` in json_data.html)
-            console.log(`[ERROR] Entso-E API: "${json_data.html.body}" (${new Date().toLocaleString('en-GB')})`);
-        else
-            console.log(`[ERROR] Cannot parse Entso-E API response! (${new Date().toLocaleString('en-GB')})`);
+    if (await check_response(response, 'Entsoe-E') === 200) {
+        // Parse the received xml into json and store price information into the returned prices array
+        let json_data;
+        try {
+            json_data = new XMLParser().parse(await response.text());
+            json_data.Publication_MarketDocument.TimeSeries.Period.Point.forEach(function (entry) {
+                prices.push(parseFloat(entry['price.amount']));
+            });
+        } catch {
+            console.log(`[ERROR] Cannot parse prices from the Entsoe-E API response (${date_string()})`)
+            try {
+                console.log(` Code: ${json_data.Acknowledgement_MarketDocument.Reason.code}\n Message: ${json_data.Acknowledgement_MarketDocument.Reason.text}`);
+            } catch {
+                console.log(` Cannot find error code or message!`);
+            }
+        }
     }
+
+    return prices;
+}
+
+// Query Elering API directly to get the daily spot prices
+async function query_elering_prices(start_date, end_date) {
+
+    // Format the dates into ISO 8601 string format at 23:00 UTC
+    const period_start = `${start_date.toISOString().slice(0, 11)}23:00:00.000Z`;
+    const period_end = `${end_date.toISOString().slice(0, 11)}23:00:00.000Z`;
+
+    // Encode the ISO strings for the API call
+    const encoded_period_start = encodeURIComponent(period_start);
+    const encoded_period_end = encodeURIComponent(period_end);
+
+    // Send API get request to Elering
+    const response = await fetch(`https://dashboard.elering.ee/api/nps/price?start=${encoded_period_start}&end=${encoded_period_end}`)
+        .catch(error => console.log(error));
+    
+    // Get prices (if query fails, empty array is returned)
+    let prices = [];
+    if (await check_response(response, 'Elering') === 200)
+        try {
+            // Elering API returns only the current price for now, so use that for all hours (only the current hour is used anyway)
+            let json_data = await response.json();
+            json_data.data[country_code].forEach(function (entry) {
+                prices.push(parseFloat(entry['price']));
+            });
+        } catch {
+            console.log(`[ERROR] Cannot parse prices from the Elering API response (${date_string()})`)
+        }
+
+    return prices;
+}
+
+
+// Get daily sport prices from Entso-E API or Elering API (backup)
+async function get_prices() {
+
+    // The date is determined from the UTC+1 time because the 24-hour API price period is from 23:00 yesterday to 23:00 today
+    const start_date = new Date(new Date().setTime(new Date().getTime() - (23 * 60 * 60 * 1000)));
+    const end_date = new Date(new Date().setTime(new Date().getTime() + (60 * 60 * 1000)));
+
+    // Query Entso-E API for the daily sport prices
+    let prices = await query_entsoe_prices(start_date, end_date);
+
+    // If Entso-E API fails, use Elering API as a backup
+    if (prices.length === 0)
+        prices = await query_elering_prices(start_date, end_date);
 
     return prices;
 }
@@ -189,7 +246,7 @@ async function adjust_heat() {
 
     // Define function for sending a post request to edgebridge
     const post_trigger = async function (device) {
-        console.log(`[REQUEST] Sending ${device} POST request to edgebridge! (${new Date().toLocaleString('en-GB')})`);
+        console.log(`[REQUEST] Sending ${device} POST request to edgebridge! (${date_string()})`);
         const response = await fetch(`http://${ip.address()}:8088/${device}/trigger`, { method: 'POST' }).catch(error => console.log(error));
     }
 
@@ -198,7 +255,7 @@ async function adjust_heat() {
 
     // Status print
     console.log(`[STATUS] heating_hours: ${heating_hours} (${outside_temp}C), price[${index - 1}]: ${prices[index]}, threshold_price: ${threshold_price} ` +
-        `(${new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC"})`);
+        `(${date_string()})`);
 
     // Send HeatOff request if price higher than threshold and the hourly price is over 4cnt/kWh, else HeatOn
     if (prices[index] > threshold_price && prices[index] > 40) {
