@@ -51,16 +51,19 @@ function keys() {
 }
 
 function date_string() {
-    return new Date().toISOString().replace(/[T]/g, ' ').slice(0, 19) + " UTC";
+    const now = new Date();
+    const time = `${now.getUTCHours().toString().padStart(2, '0')}:${now.getUTCMinutes().toString().padStart(2, '0')}:${now.getUTCSeconds().toString().padStart(2, '0')}`;
+    const date = `${now.getUTCDate().toString().padStart(2, '0')}-${(now.getUTCMonth() + 1).toString().padStart(2, '0')}-${now.getUTCFullYear()}`;
+    return `${time} ${date} UTC`;
 }
 
 // Check the fetch response status
 async function check_response(response, type) {
     if (response.status === 200) {
-        console.log(`[REQUEST] ${type} query successful (${date_string()})`);
+        console.log(`[${date_string()}] ${type} query successful!`);
     }
     else {
-        console.log(`[ERROR] ${type} query failed (${date_string()})`)
+        console.log(`[ERROR ${date_string()}] ${type} query failed!`)
         console.log(` API Status: ${response.status}\n API response: ${response.statusText}`);
     }
     return response.status;
@@ -83,7 +86,7 @@ async function query_entsoe_prices(start_date, end_date) {
 
     // Send API get request to Entso-E
     const request = `https://web-api.tp.entsoe.eu/api?securityToken=${api_key}&documentType=${document_type}&processType=${process_type}` +
-                    `&in_Domain=${location_id}&out_Domain=${location_id}&periodStart=${period_start}&periodEnd=${period_end}`
+        `&in_Domain=${location_id}&out_Domain=${location_id}&periodStart=${period_start}&periodEnd=${period_end}`
     const response = await fetch(request).catch(error => console.log(error));
 
     // Get prices (if query fails, empty array is returned)
@@ -97,7 +100,7 @@ async function query_entsoe_prices(start_date, end_date) {
                 prices.push(parseFloat(entry['price.amount']));
             });
         } catch {
-            console.log(`[ERROR] Cannot parse prices from the Entsoe-E API response (${date_string()})`)
+            console.log(`[ERROR ${date_string()}] Cannot parse prices from the Entsoe-E API response!`)
             try {
                 console.log(` Code: ${json_data.Acknowledgement_MarketDocument.Reason.code}\n Message: ${json_data.Acknowledgement_MarketDocument.Reason.text}`);
             } catch {
@@ -123,7 +126,7 @@ async function query_elering_prices(start_date, end_date) {
     // Send API get request to Elering
     const response = await fetch(`https://dashboard.elering.ee/api/nps/price?start=${encoded_period_start}&end=${encoded_period_end}`)
         .catch(error => console.log(error));
-    
+
     // Get prices (if query fails, empty array is returned)
     let prices = [];
     if (await check_response(response, 'Elering') === 200)
@@ -134,7 +137,7 @@ async function query_elering_prices(start_date, end_date) {
                 prices.push(parseFloat(entry['price']));
             });
         } catch {
-            console.log(`[ERROR] Cannot parse prices from the Elering API response (${date_string()})`)
+            console.log(`[ERROR ${date_string()}] Cannot parse prices from the Elering API response!`)
         }
 
     return prices;
@@ -246,7 +249,7 @@ async function adjust_heat() {
 
     // Define function for sending a post request to edgebridge
     const post_trigger = async function (device) {
-        console.log(`[REQUEST] Sending ${device} POST request to edgebridge! (${date_string()})`);
+        console.log(`[${date_string()}] Sending ${device} POST request to edgebridge!`);
         const response = await fetch(`http://${ip.address()}:8088/${device}/trigger`, { method: 'POST' }).catch(error => console.log(error));
     }
 
@@ -254,8 +257,7 @@ async function adjust_heat() {
     const index = parseInt(new Date(new Date().setTime(new Date().getTime() + (60 * 60 * 1000))).getUTCHours());
 
     // Status print
-    console.log(`[STATUS] heating_hours: ${heating_hours} (${outside_temp}C), price[${index - 1}]: ${prices[index]}, threshold_price: ${threshold_price} ` +
-        `(${date_string()})`);
+    console.log(`[${date_string()}] heating_hours: ${heating_hours} (${outside_temp}C), price[${index - 1}]: ${prices[index]}, threshold_price: ${threshold_price}`);
 
     // Send HeatOff request if price higher than threshold and the hourly price is over 4cnt/kWh, else HeatOn
     if (prices[index] > threshold_price && prices[index] > 40) {
