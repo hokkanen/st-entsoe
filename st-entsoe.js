@@ -7,7 +7,7 @@ const { XMLParser, XMLBuilder, XMLValidator } = require("fast-xml-parser");
 // Set debugging settings and prints
 const DEBUG = false;
 
-// Set path to apikey file and heatoff csv
+// Set path to apikey file and output csv
 const apikey_path = './workspace/apikey';
 const csv_path = './workspace/st-entsoe.csv';
 
@@ -213,7 +213,7 @@ async function get_outside_temp() {
         return (await response.json()).main.temp;
 }
 
-async function write_csv(heatoff, price, temp_in, temp_out) {
+async function write_csv(price, heaton, temp_in, temp_out) {
     // Check if the file already exists and is not empty
     const csv_append = fs.existsSync(csv_path) && !(fs.statSync(csv_path).size === 0);
 
@@ -223,7 +223,7 @@ async function write_csv(heatoff, price, temp_in, temp_out) {
 
     // Append data to the file
     const unix_time = Math.floor(Date.now() / 1000);
-    fs.appendFileSync(csv_path, `${unix_time},${heatoff},${price},${temp_in},${temp_out}\n`);
+    fs.appendFileSync(csv_path, `${unix_time},${price.toFixed(3)},${heaton},${temp_in.toFixed(1)},${temp_out.toFixed(1)}\n`);
 }
 
 // Control heating by sending a POST request to edgebridge
