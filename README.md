@@ -1,6 +1,6 @@
-# SmartThings edgebridge electricity price feeder (Entso-E API)
+# SmartThings edgebridge electricity price feeder
 
-The [st-entsoe.js](st-entsoe.js) nodejs program obtains Finnish electricity prices from the [Entso-E Transparency platform API](https://transparency.entsoe.eu/), and sends an http binary request through the [edgebridge project](https://github.com/toddaustin07/edgebridge) to the [LAN Trigger](https://github.com/toddaustin07/lantrigger) edge driver installed on SmartThings. 
+The [st-entsoe.js](st-entsoe.js) nodejs program obtains Finnish electricity prices from [Entso-E Transparency platform API](https://transparency.entsoe.eu/) or [Elering API](https://dashboard.elering.ee/assets/api-doc.html) (backup), and sends an http binary request through the [edgebridge project](https://github.com/toddaustin07/edgebridge) to the [LAN Trigger](https://github.com/toddaustin07/lantrigger) edge driver installed on SmartThings. 
 
 NOTE! The device running [st-entsoe.js](st-entsoe.js) should be connected to the same local area network as the SmartThings hub.
 
@@ -26,12 +26,24 @@ The [work directory](workspace) for [st-entsoe.js](st-entsoe.js) should contain 
 ## Running
 Run [edgebridge.py](https://github.com/toddaustin07/edgebridge/edgebridge.py) and [st-entsoe.js](st-entsoe.js) with pm2 by
 ```
-pm2 start edgebridge/edgebridge.py --interpreter python3
+pm2 start edgebridge/edgebridge.py --interpreter python3 -- -u
 ```
 and
 ```
 pm2 start st-entsoe/st-entsoe.js
 ```
+
+## Create persistent app list
+Make `pm2` restart automatically after reboot by
+```
+pm2 startup
+```
+and following the instructions. After all desired apps have been started, save the app list by
+
+```
+pm2 save
+```
+so the apps will respawn after reboot. After a `nodejs` upgrade the startup script should be updated by running `pm2 unstartup` and `pm2 startup`.
 
 ## Edgebridge status monitoring from SmartThings (optional)
 In addition to installing the [LAN Trigger](https://github.com/toddaustin07/lantrigger) edge driver for SmartThings app, it may be convenient to install [EdgeBridge Monitor](https://github.com/toddaustin07/edgebridge#optional-edgebridge-server-monitoring) edge driver as well to monitor the online/offline status of the [edgebridge](https://github.com/toddaustin07/edgebridge/) client.
