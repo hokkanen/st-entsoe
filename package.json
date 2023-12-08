@@ -2,6 +2,7 @@
   "dependencies": {
     "fast-xml-parser": "^4.3.2",
     "ip": "^1.1.8",
+    "mqtt": "^5.3.3",
     "node-fetch": "^2.7.0",
     "node-schedule": "^2.1.1"
   }

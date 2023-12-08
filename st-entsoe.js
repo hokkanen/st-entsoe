@@ -1,6 +1,7 @@
 const fetch = require('node-fetch');
 const fs = require('fs');
 const ip = require('ip');
+const mqtt = require('mqtt');
 const schedule = require('node-schedule');
 const { XMLParser, XMLBuilder, XMLValidator } = require("fast-xml-parser");
 
@@ -137,7 +138,7 @@ async function query_elering_prices(start_date, end_date) {
                 prices.push(parseFloat(entry['price']));
             });
         } catch {
-            console.log(`[ERROR ${date_string()}] Cannot parse prices from the Elering API response!`)
+            console.log(`[ERROR ${date_string()}] Cannot parse prices from the Elering API response!`);
         }
 
     return prices;
@@ -227,7 +228,7 @@ async function write_csv(price, heaton, temp_in, temp_out) {
 }
 
 // Control heating by sending a POST request to edgebridge
-async function adjust_heat() {
+async function adjust_heat(mqtt_client) {
 
     // Get daily spot prices
     const prices = await get_prices();
@@ -248,9 +249,15 @@ async function adjust_heat() {
     const threshold_price = sorted_prices[heating_hours - 1];
 
     // Define function for sending a post request to edgebridge
-    const post_trigger = async function (device) {
-        console.log(`[${date_string()}] Sending ${device} POST request to edgebridge!`);
-        const response = await fetch(`http://${ip.address()}:8088/${device}/trigger`, { method: 'POST' }).catch(error => console.log(error));
+    const post_trigger = async function (client, topic) {
+        client.publish(topic, 'msg', function (error) {
+            if (error) {
+                console.log(`[ERROR ${date_string()}] Failed to publish MQTT message:\n`);
+                console.log(error);
+            } else {
+                console.log(`[${date_string()}] Published '${topic}' MQTT message for SmartThings!`);
+            }
+        });
     }
 
     // The index maps to the ceiling of the current UTC hour (0 for 23-00, 1 for 00-01, 2 for 01-02)
@@ -261,10 +268,10 @@ async function adjust_heat() {
 
     // Send HeatOff request if price higher than threshold and the hourly price is over 4cnt/kWh, else HeatOn
     if (prices[index] > threshold_price && prices[index] > 40) {
-        await post_trigger("HeatOff");
+        await post_trigger(mqtt_client, "heat/off");
         await write_csv(prices[index] / 10.0, 0, inside_temp, outside_temp);
     } else {
-        await post_trigger("HeatOn");
+        await post_trigger(mqtt_client, "heat/on");
         await write_csv(prices[index] / 10.0, 1, inside_temp, outside_temp);
     }
 
@@ -276,7 +283,9 @@ async function adjust_heat() {
 
 // Begin execution here
 (async () => {
+    // Connect to MQTT broker
+    const mqtt_client = mqtt.connect('mqtt://localhost');
     // Run once and then control heating with set schedule
-    adjust_heat();
-    schedule.scheduleJob('0 * * * *', adjust_heat);
+    adjust_heat(mqtt_client);
+    schedule.scheduleJob('0 * * * *', () => adjust_heat(mqtt_client));
 })();
