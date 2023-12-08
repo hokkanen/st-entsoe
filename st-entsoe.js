@@ -249,13 +249,13 @@ async function adjust_heat(mqtt_client) {
     const threshold_price = sorted_prices[heating_hours - 1];
 
     // Define function for sending a post request to edgebridge
-    const post_trigger = async function (client, topic) {
-        client.publish(topic, 'msg', function (error) {
+    const post_trigger = async function (client, topic, msg) {
+        client.publish(topic, msg, function (error) {
             if (error) {
                 console.log(`[ERROR ${date_string()}] Failed to publish MQTT message:\n`);
                 console.log(error);
             } else {
-                console.log(`[${date_string()}] Published '${topic}' MQTT message for SmartThings!`);
+                console.log(`[${date_string()}] Published ${topic}:'${msg}' through MQTT for SmartThings!`);
             }
         });
     }
@@ -268,10 +268,10 @@ async function adjust_heat(mqtt_client) {
 
     // Send HeatOff request if price higher than threshold and the hourly price is over 4cnt/kWh, else HeatOn
     if (prices[index] > threshold_price && prices[index] > 40) {
-        await post_trigger(mqtt_client, "heat/off");
+        await post_trigger(mqtt_client, "st/heat", "OFF");
         await write_csv(prices[index] / 10.0, 0, inside_temp, outside_temp);
     } else {
-        await post_trigger(mqtt_client, "heat/on");
+        await post_trigger(mqtt_client, "st/heat", "ON");
         await write_csv(prices[index] / 10.0, 1, inside_temp, outside_temp);
     }
 
