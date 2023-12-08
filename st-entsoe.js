@@ -252,7 +252,7 @@ async function adjust_heat(mqtt_client) {
     const post_trigger = async function (client, topic, msg) {
         client.publish(topic, msg, function (error) {
             if (error) {
-                console.log(`[ERROR ${date_string()}] Failed to publish MQTT message:\n`);
+                console.log(`[ERROR ${date_string()}] Failed to publish ${topic}:'${msg}' MQTT message:`);
                 console.log(error);
             } else {
                 console.log(`[${date_string()}] Published ${topic}:'${msg}' through MQTT for SmartThings!`);
